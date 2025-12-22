@@ -1,4 +1,5 @@
 import type IRenderable from "../../core/interfaces/IRenderable";
+import { Lift } from "../../core/Lift";
 class ControlButton implements IRenderable {
   private x: number;
   private y: number;
@@ -32,11 +33,6 @@ class ControlButton implements IRenderable {
     const dy = my - cy;
 
     return dx * dx + dy * dy <= r * r;
-  }
-
-  public onClick(): void {
-    // override in subclasses
-    console.log(`Button ${this.label} clicked`);
   }
 
   public setLit(lit: boolean): void {

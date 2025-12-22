@@ -1,7 +1,15 @@
-import { Lift } from "./core/Lift";
+import { Lift, type LiftConfig } from "./core/Lift";
 
 const canvas = document.getElementById("main") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d");
+const powerButton = document.getElementById("power") as HTMLButtonElement;
 
-const lift = new Lift( 5, canvas!, ctx!);
-lift.start();
+const config: LiftConfig = {
+  startingLatency: 3000,
+  waitDuration: 3000,
+  speedRate: 0.05,
+  numberofFloors: 5,
+  maxCapacity: 450,
+};
+
+const lift = new Lift(config, canvas!, ctx!, powerButton);

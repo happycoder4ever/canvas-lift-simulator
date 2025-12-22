@@ -3,29 +3,68 @@ import type IRenderable from "./interfaces/IRenderable";
 import type IUpdatable from "./interfaces/IUpdatable";
 import ControlPanel from "../ui/ControlPanel";
 import Display from "../ui/Display";
+import { Shaft } from "../ui/Shaft";
 
+type LiftState = "idle" | "up" | "down" | "doorOpening" | "doorClosing";
+type ScheduleType = "null" | "call-up" | "call-down" | "go" | "error";
+type PowerState = "on" | "off" | "starting" | "stopping";
+
+export interface LiftConfig {
+  startingLatency: number;
+  waitDuration: number;
+  speedRate: number; // speed repsented percent per millisecond; 0.04 (moves 0.04% of the floor height per milliesecond, meaning 40% per second)
+  numberofFloors: number;
+  maxCapacity: number; // maximum capacity in kg
+}
 export class Lift implements IRenderable, IUpdatable {
-  private numberofFloors: number;
+  // basic configuration
+  private config: LiftConfig;
+
+  // current parameters
+  private currentFloor: number = 0;
+  private currentLoad: number = 0; // in kg
+  private state: LiftState = "idle";
+  private powerState: PowerState = "off";
+
+  // tick timers
+  private startTimer: number = 0;
+  private waitTimer: number = 0;
+
+  private scheduleList: ScheduleType[] = [];
+
+  // working time
   private time: number = 0;
 
-  private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private metalPattern: CanvasPattern | null = null;
-
+  private powerButton: HTMLButtonElement;
   private controlPanel: ControlPanel;
   private display: Display;
+  private shaft: Shaft;
 
   constructor(
-    floors: number,
+    config: LiftConfig,
     canvas: HTMLCanvasElement,
-    ctx: CanvasRenderingContext2D
+    ctx: CanvasRenderingContext2D,
+    button: HTMLButtonElement
   ) {
-    this.canvas = canvas;
-    this.numberofFloors = floors;
+    this.config = config;
     this.ctx = ctx;
+    this.powerButton = button;
+    button.textContent = "Start";
+    button.addEventListener("click", () => {
+      if (this.powerState === "off") this.start();
+      if (this.powerState === "on") this.stop();
+    });
+
     this.metalPattern = patternedBrush()(this.ctx);
-    this.display = new Display(this.ctx);
-    this.controlPanel = new ControlPanel(this.ctx);
+    this.display = new Display(450, 50, this.ctx, this);
+    this.controlPanel = new ControlPanel(this.ctx, this);
+    this.shaft = new Shaft(this.ctx, this);
+
+    for (let i = 0; i < this.config.numberofFloors; i++)
+      this.scheduleList.push("null");
+
     this.loop = this.loop.bind(this);
 
     canvas.addEventListener("click", (event) => {
@@ -45,7 +84,55 @@ export class Lift implements IRenderable, IUpdatable {
       ) {
         this.controlPanel["closeDoorButton"].onClick();
       }
+
+      for (const floorBox of this.shaft["floorBoxes"]) {
+        if (floorBox["UpButton"].contains(mouseX, mouseY))
+          floorBox["UpButton"].onClick();
+        else if (floorBox["DownButton"].contains(mouseX, mouseY))
+          floorBox["DownButton"].onClick();
+      }
     });
+    this.render();
+  }
+
+  public getState(): LiftState {
+    return this.state;
+  }
+
+  public getCurrentFloor(): number {
+    // Implementation to get the current floor
+    return this.currentFloor; // Placeholder
+  }
+
+  public getMaxCapacity(): number {
+    return this.config.maxCapacity;
+  }
+  public getCurrentLoad(): number {
+    return this.currentLoad;
+  }
+
+  public getNumberOfFloors(): number {
+    return this.config.numberofFloors;
+  }
+
+  public getPowerState(): PowerState {
+    return this.powerState;
+  }
+
+  public getPowerProgress(): number {
+    return (this.startTimer / this.config.waitDuration) * 10;
+  }
+  public getSchedule(floor: number): ScheduleType {
+    if (floor >= 0 && floor < this.config.numberofFloors)
+      return this.scheduleList[floor];
+    return "error";
+  }
+
+  public addToSchedule(floor: number, schedule: ScheduleType): void {
+    if (floor >= 0 && floor < this.config.numberofFloors) {
+      if (schedule === "go") this.scheduleList[floor] = "go";
+      else if (this.scheduleList[floor] === "go") return;
+    }
   }
 
   private loop(time: number): void {
@@ -54,7 +141,7 @@ export class Lift implements IRenderable, IUpdatable {
     this.update(deltaTime);
     this.render();
     this.time = time;
-    requestAnimationFrame(this.loop);
+    if (this.powerState !== "off") requestAnimationFrame(this.loop);
   }
 
   public render(): void {
@@ -64,45 +151,7 @@ export class Lift implements IRenderable, IUpdatable {
     this.ctx.clearRect(0, 0, 800, 800);
 
     // 2. Draw static elements (e.g., left panel of floor boxes, and right panel background)
-    // Left Panel Background
-    this.ctx.fillStyle = "#2e2e4e";
-    this.ctx.fillRect(0, 0, 300, 800); // Left panel
-
-    for (let i = 0; i < this.numberofFloors; i++) {
-      let floorX = 50;
-      let floorY = 700 - i * 100;
-      let floorWidth = 200;
-      let floorHeight = 80;
-      let floorTextX = floorX + 35;
-      let floorTextY = floorY + 50;
-      let floorButtonUpX = floorX + 150;
-      let floorButtonUpY = floorY + 10;
-      let floorButtonDownX = floorX + 150;
-      let floorButtonDownY = floorY + 40;
-      // Draw Floor Box
-      this.ctx.fillStyle = "#c0c0c0";
-      this.ctx.fillRect(floorX, floorY, floorWidth, floorHeight);
-      this.ctx.fillStyle = "#000000";
-      this.ctx.font = "30px Arial";
-      this.ctx.fillText(`${i + 1}F`, floorTextX, floorTextY);
-
-      // Draw Call Buttons for each floor, Up and Down
-      this.ctx.fillStyle = "#808080";
-      // Up arrow
-      this.ctx.beginPath();
-      this.ctx.moveTo(floorButtonUpX + 10, floorButtonUpY + 5);
-      this.ctx.lineTo(floorButtonUpX + 20, floorButtonUpY + 25);
-      this.ctx.lineTo(floorButtonUpX, floorButtonUpY + 25);
-      this.ctx.closePath();
-      this.ctx.fill();
-      // Down arrow
-      this.ctx.beginPath();
-      this.ctx.moveTo(floorButtonDownX + 10, floorButtonDownY + 25);
-      this.ctx.lineTo(floorButtonDownX + 20, floorButtonDownY + 5);
-      this.ctx.lineTo(floorButtonDownX, floorButtonDownY + 5);
-      this.ctx.closePath();
-      this.ctx.fill();
-    }
+    this.shaft.render();
 
     // Right Panel Background with Metal Pattern
     this.ctx.fillStyle = this.metalPattern!;
@@ -124,14 +173,52 @@ export class Lift implements IRenderable, IUpdatable {
 
     // 3. Draw dynamic elements (e.g., cabin indicator on the left, and the display on the right)
   }
+
   public update(deltaTime: number): void {
+    // for smooth starting / stopping
+    if (this.powerState === "starting") {
+      this.startTimer += deltaTime;
+      if (this.startTimer >= this.config.startingLatency) {
+        this.powerState = "on";
+        console.log(`Power is on`);
+        this.powerButton.disabled = false;
+        this.powerButton.textContent = "Stop";
+        this.startTimer = 0;
+      } else return;
+    }
+    if (this.powerState === "stopping") {
+      this.startTimer += deltaTime;
+      if (this.startTimer >= this.config.startingLatency) {
+        this.powerState = "off";
+        console.log(`Power is off`);
+        this.powerButton.disabled = false;
+        this.powerButton.textContent = "Start";
+        this.startTimer = 0;
+      } else return;
+    }
+
     // Implementation of the update method
+    this.shaft.update(deltaTime);
+    this.controlPanel.update(deltaTime);
+    this.display.update(deltaTime);
   }
   public start(): void {
+    console.log("Starting...");
+    this.powerButton.textContent = "Starting...";
+    this.powerButton.disabled = true;
+
+    this.powerState = "starting";
+    this.startTimer = 0;
+
     requestAnimationFrame(this.loop);
   }
 
   public stop(): void {
-    // Implementation to stop the loop if needed
+    console.log("Stopping...");
+    this.powerButton.textContent = "Stopping...";
+    this.powerButton.disabled = true;
+
+    this.powerState = "stopping";
+    this.startTimer = 0;
   }
 }
