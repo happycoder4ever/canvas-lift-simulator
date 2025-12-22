@@ -16,5 +16,10 @@ class FloorButton extends ControlButton {
   public push(): void {
     // Implementation of push method
   }
+
+  public onClick(): void {
+    this.setLit(true);
+    console.log(`Floor ${this.floorId} selected`);
+  }
 }
 export default FloorButton;

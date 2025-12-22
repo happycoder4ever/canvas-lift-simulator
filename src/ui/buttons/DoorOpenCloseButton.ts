@@ -11,6 +11,10 @@ class DoorOpenCloseButton extends ControlButton {
     super(x, y, 50, 50, label, ctx);
     this.isOpenButton = isOpenButton;
   }
+  public onClick(): void {
+    console.log(this.isOpenButton ? "Door open" : "Door close");
+    this.setLit(true);
+  }
 }
 
 export default DoorOpenCloseButton;

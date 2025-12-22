@@ -23,6 +23,21 @@ class ControlButton implements IRenderable {
     this.height = height;
     this.label = label;
   }
+  public contains(mx: number, my: number): boolean {
+    const cx = this.x + this.width / 2;
+    const cy = this.y + this.height / 2;
+    const r = this.width / 2;
+
+    const dx = mx - cx;
+    const dy = my - cy;
+
+    return dx * dx + dy * dy <= r * r;
+  }
+
+  public onClick(): void {
+    // override in subclasses
+    console.log(`Button ${this.label} clicked`);
+  }
 
   public setLit(lit: boolean): void {
     this.isLit = lit;
