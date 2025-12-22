@@ -24,7 +24,8 @@ class FloorButton extends ControlButton {
   public onClick(): void {
     if (this.lift.getPowerState() !== "on") return;
     this.setLit(true);
-    console.log(`Floor ${this.floorId} selected`);
+
+    this.lift.addToSchedule(this.floorId, "go");
   }
 }
 export default FloorButton;

@@ -44,8 +44,6 @@ class ControlPanel implements IRenderable, IUpdatable {
   }
 
   public render(): void {
-    // Implementation of render method
-
     // Render Floor Buttons
     for (const button of this.floorButtons) {
       button.render();

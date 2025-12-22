@@ -9,8 +9,8 @@ export class FloorBox implements IRenderable {
   private floorNumber: number;
   private x: number;
   private y: number;
-  private UpButton: CallButton;
-  private DownButton: CallButton;
+  private UpButton: CallButton | null = null;
+  private DownButton: CallButton | null = null;
 
   constructor(
     floorNumber: number,
@@ -25,6 +25,7 @@ export class FloorBox implements IRenderable {
     this.ctx = ctx;
     this.lift = lift;
 
+    if(this.floorNumber !== this.lift.getNumberOfFloors() - 1)
     this.UpButton = new CallButton(
       this.floorNumber,
       "up",
@@ -33,30 +34,36 @@ export class FloorBox implements IRenderable {
       ctx,
       this.lift
     );
-    this.DownButton = new CallButton(
-      this.floorNumber,
-      "down",
-      this.x + 150,
-      this.y + 40,
-      ctx,
-      this.lift
-    );
+    if (this.floorNumber !== 0)
+      this.DownButton = new CallButton(
+        this.floorNumber,
+        "down",
+        this.x + 150,
+        this.y + 40,
+        ctx,
+        this.lift
+      );
   }
 
   public render(): void {
     let floorWidth = 200;
     let floorHeight = 80;
-    let floorTextX = this.x + 35;
+    let floorTextX = this.x + 25;
     let floorTextY = this.y + 50;
     // Draw Floor Box
     this.ctx.fillStyle = "#c0c0c0";
     this.ctx.fillRect(this.x, this.y, floorWidth, floorHeight);
-    this.ctx.fillStyle = "#000000";
+
+    this.ctx.fillStyle =
+      this.lift.getPowerState() === "on" &&
+      this.floorNumber === this.lift.getCurrentFloor()
+        ? "#ffffff"
+        : "#000000";
     this.ctx.font = "30px Arial";
     this.ctx.fillText(`${this.floorNumber + 1}F`, floorTextX, floorTextY);
 
     // Draw Call Buttons for each floor, Up and Down
-    this.UpButton.render();
-    this.DownButton.render();
+    this.UpButton?.render();
+    this.DownButton?.render();
   }
 }

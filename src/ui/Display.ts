@@ -66,7 +66,10 @@ class Display implements IRenderable, IUpdatable {
       // Print information on the LED Screen
       // (1) Up/Down Arrows
       this.ctx.fillStyle =
-        this.lift.getState() === "up" ? "#ffffff" : "#80808099";
+        this.lift.getState() === "moving" &&
+        this.lift.getMoveDirection() === "up"
+          ? "#ffffff"
+          : "#80808099";
       // Up arrow
       this.ctx.beginPath();
       this.ctx.moveTo(displayLEDX + 30, displayLEDY + 10);
@@ -77,7 +80,10 @@ class Display implements IRenderable, IUpdatable {
       this.ctx.fill();
       // Down arrow under the up arrow
       this.ctx.fillStyle =
-        this.lift.getState() === "down" ? "#ffffff" : "#80808099";
+        this.lift.getState() === "moving" &&
+        this.lift.getMoveDirection() === "down"
+          ? "#ffffff"
+          : "#80808099";
       this.ctx.beginPath();
       this.ctx.moveTo(displayLEDX + 30, displayLEDY + 55);
       this.ctx.lineTo(displayLEDX + 50, displayLEDY + 45);

@@ -7,9 +7,10 @@ const powerButton = document.getElementById("power") as HTMLButtonElement;
 const config: LiftConfig = {
   startingLatency: 3000,
   waitDuration: 3000,
+  doorDuration: 2000,
   speedRate: 0.05,
   numberofFloors: 5,
   maxCapacity: 450,
 };
 
-const lift = new Lift(config, canvas!, ctx!, powerButton);
+new Lift(config, canvas!, ctx!, powerButton);

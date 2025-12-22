@@ -30,13 +30,17 @@ export class Shaft implements IRenderable, IUpdatable {
     }
 
     // Draw a light emitting circle beside the current floor
-    if(this.lift.getPowerState() === "on") {
-
+    if (this.lift.getPowerState() === "on") {
       let currentFloor = this.lift.getCurrentFloor();
+
       let indicatorX = 30;
       let indicatorY = 740 - currentFloor * 100;
+
+      if (this.lift.getState() === "moving") {
+        indicatorY -= this.lift.getMoveProgress();
+      }
       // Light Emit Gradient according to blinking frame
-  
+
       const gradient = this.ctx.createRadialGradient(
         indicatorX,
         indicatorY,
@@ -45,7 +49,7 @@ export class Shaft implements IRenderable, IUpdatable {
         indicatorY,
         15
       );
-  
+
       // Smooth blinking effect
       const intensity =
         0.5 +
@@ -57,7 +61,7 @@ export class Shaft implements IRenderable, IUpdatable {
           );
       gradient.addColorStop(0, `rgba(255, 255, 0, ${intensity})`);
       gradient.addColorStop(1, "rgba(255, 255, 0, 0.0)");
-  
+
       this.ctx.fillStyle = gradient;
       this.ctx.beginPath();
       this.ctx.arc(indicatorX, indicatorY, 10, 0, Math.PI * 2);
