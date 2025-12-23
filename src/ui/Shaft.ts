@@ -19,6 +19,10 @@ export class Shaft implements IRenderable, IUpdatable {
       this.floorBoxes.push(floorBox);
     }
   }
+
+  public offLight(floorNumber: number) {
+    this.floorBoxes[floorNumber].offLight();
+  }
   public render(): void {
     // Implementation of render method
     // Left Panel Background
@@ -29,43 +33,95 @@ export class Shaft implements IRenderable, IUpdatable {
       this.floorBoxes[i].render();
     }
 
-    // Draw a light emitting circle beside the current floor
+    // Draw a mini cabin beside the current floor
     if (this.lift.getPowerState() === "on") {
-      let currentFloor = this.lift.getCurrentFloor();
+      const currentFloor = this.lift.getCurrentFloor();
 
-      let indicatorX = 30;
-      let indicatorY = 740 - currentFloor * 100;
+      // Base X/Y for cabin
+      const cabinX = 20;
+      let cabinY = 740 - currentFloor * 100; // floor spacing
 
+      // Smooth movement when lift is moving
       if (this.lift.getState() === "moving") {
-        indicatorY -= this.lift.getMoveProgress();
+        const progressPixels = (this.lift.getMoveProgress() / 100) * 100;
+        cabinY +=
+          this.lift.getMoveDirection() === "up"
+            ? -progressPixels
+            : progressPixels;
       }
-      // Light Emit Gradient according to blinking frame
 
-      const gradient = this.ctx.createRadialGradient(
-        indicatorX,
-        indicatorY,
-        2,
-        indicatorX,
-        indicatorY,
-        15
+      // Cabin dimensions
+      const cabinWidth = 20;
+      const cabinHeight = 40;
+
+      // Draw cabin body
+      this.ctx.fillStyle = "#555"; // dark gray metal
+      this.ctx.fillRect(
+        cabinX,
+        cabinY - cabinHeight / 2,
+        cabinWidth,
+        cabinHeight
       );
 
-      // Smooth blinking effect
-      const intensity =
-        0.5 +
-        0.5 *
-          Math.sin(
-            (this.currentLightBlinkingFrame / this.lightBlinkingPeriod) *
-              2 *
-              Math.PI
-          );
-      gradient.addColorStop(0, `rgba(255, 255, 0, ${intensity})`);
-      gradient.addColorStop(1, "rgba(255, 255, 0, 0.0)");
+      // Draw doors
+      // Compute doorProgress for rendering
+      let doorProgress = this.lift.getDoorProgress() / 100; // 0 → 1
 
-      this.ctx.fillStyle = gradient;
+      // Keep doors fully open if state is 'waiting' or already open
+      if (this.lift.getDoorState() === "open") {
+        doorProgress = 1; // fully open
+      }
+
+      // Invert progress if doors are closing
+      if (this.lift.getState() === "doorClosing") {
+        doorProgress = 1 - doorProgress;
+      }
+
+      const halfWidth = cabinWidth / 2;
+
+      // Left door slides left from center
+      const leftDoorX = cabinX;
+      const leftDoorWidth = halfWidth * (1 - doorProgress);
+
+      // Right door slides right from center
+      const rightDoorX = cabinX + halfWidth + doorProgress * halfWidth;
+      const rightDoorWidth = halfWidth * (1 - doorProgress);
+
+      this.ctx.fillStyle = "#ccc"; // lighter for doors
+
+      // Draw left door
+      this.ctx.fillRect(
+        leftDoorX,
+        cabinY - cabinHeight / 2,
+        leftDoorWidth,
+        cabinHeight
+      );
+
+      // Draw right door
+      this.ctx.fillRect(
+        rightDoorX,
+        cabinY - cabinHeight / 2,
+        rightDoorWidth,
+        cabinHeight
+      );
+
+      // Thin center line to visualize doors
+      this.ctx.strokeStyle = "#555";
+      this.ctx.lineWidth = 1;
       this.ctx.beginPath();
-      this.ctx.arc(indicatorX, indicatorY, 10, 0, Math.PI * 2);
-      this.ctx.fill();
+      this.ctx.moveTo(cabinX + halfWidth, cabinY - cabinHeight / 2);
+      this.ctx.lineTo(cabinX + halfWidth, cabinY + cabinHeight / 2);
+      this.ctx.stroke();
+
+      // Optional outline
+      this.ctx.strokeStyle = "#000";
+      this.ctx.lineWidth = 1.5;
+      this.ctx.strokeRect(
+        cabinX,
+        cabinY - cabinHeight / 2,
+        cabinWidth,
+        cabinHeight
+      );
     }
   }
   public update(deltaTime: number): void {

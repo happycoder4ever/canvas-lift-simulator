@@ -68,8 +68,12 @@ export class CallButton implements IRenderable {
   public onClick() {
     if (this.lift.getPowerState() !== "on") return;
     this.isLit = true;
-    console.log(`Request ${this.direction} from ${this.floorNumber + 1}F`);
+    console.log(`Request call-${this.direction} from ${this.floorNumber + 1}F`);
     this.lift.addToSchedule(this.floorNumber, `call-${this.direction}`);
+  }
+
+  public setLit(isLit: boolean) {
+    this.isLit = isLit;
   }
 
   public render(): void {

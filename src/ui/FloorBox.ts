@@ -25,15 +25,15 @@ export class FloorBox implements IRenderable {
     this.ctx = ctx;
     this.lift = lift;
 
-    if(this.floorNumber !== this.lift.getNumberOfFloors() - 1)
-    this.UpButton = new CallButton(
-      this.floorNumber,
-      "up",
-      this.x + 150,
-      this.y + 10,
-      ctx,
-      this.lift
-    );
+    if (this.floorNumber !== this.lift.getNumberOfFloors() - 1)
+      this.UpButton = new CallButton(
+        this.floorNumber,
+        "up",
+        this.x + 150,
+        this.y + 10,
+        ctx,
+        this.lift
+      );
     if (this.floorNumber !== 0)
       this.DownButton = new CallButton(
         this.floorNumber,
@@ -43,6 +43,11 @@ export class FloorBox implements IRenderable {
         ctx,
         this.lift
       );
+  }
+
+  public offLight() {
+    this.DownButton?.setLit(false);
+    this.UpButton?.setLit(false);
   }
 
   public render(): void {

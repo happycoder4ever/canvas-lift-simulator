@@ -43,6 +43,9 @@ class ControlPanel implements IRenderable, IUpdatable {
     );
   }
 
+  public offLight(floorNumber: number) {
+    this.floorButtons[floorNumber].setLit(false);
+  }
   public render(): void {
     // Render Floor Buttons
     for (const button of this.floorButtons) {

@@ -17,7 +17,6 @@ class Display implements IRenderable, IUpdatable {
     // Implementation of render method
     let displayLEDX = this.x + 10;
     let displayLEDY = this.y + 10;
-    console.log(`${displayLEDX}, ${displayLEDY}`);
 
     let displayWidth = 200;
     let displayHeight = 100;
@@ -101,6 +100,13 @@ class Display implements IRenderable, IUpdatable {
         displayLEDY + 75
       );
 
+      // (2.5) Current State
+      this.ctx.font = "12px Arial";
+      this.ctx.fillText(
+        this.lift.getState(),
+        displayLEDX + 110,
+        displayLEDY + 25
+      );
       // (3) Maximum Capacity
       this.ctx.font = "12px Arial";
       this.ctx.fillText(
