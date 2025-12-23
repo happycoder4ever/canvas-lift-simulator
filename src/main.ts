@@ -9,7 +9,7 @@ const config: LiftConfig = {
   waitDuration: 3000,
   doorDuration: 2000,
   speedRate: 0.05,
-  numberofFloors: 5,
+  numberofFloors: 8,
   maxCapacity: 450,
 };
 

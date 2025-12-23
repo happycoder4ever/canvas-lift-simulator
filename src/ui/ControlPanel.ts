@@ -23,6 +23,7 @@ class ControlPanel implements IRenderable, IUpdatable {
         this.ctx,
         lift
       );
+
       this.floorButtons.push(button);
     }
 
@@ -44,14 +45,19 @@ class ControlPanel implements IRenderable, IUpdatable {
   }
 
   public offLight(floorNumber: number) {
-    this.floorButtons[floorNumber].setLit(false);
+    this.floorButtons[floorNumber]?.setLit(false);
   }
   public render(): void {
-    // Render Floor Buttons
-    for (const button of this.floorButtons) {
+    for (const [index, button] of this.floorButtons.entries()) {
+      // Only turn on if schedule exists and the button is not already lit
+      if (this.lift.getSchedule(index) !== "null" && !button.getLit()) {
+        button.setLit(true);
+      }
+
+      // Do NOT forcibly turn off here — rely on offLight() to handle that
       button.render();
     }
-    // Render Door Open/Close Buttons
+
     this.openDoorButton.render();
     this.closeDoorButton.render();
   }

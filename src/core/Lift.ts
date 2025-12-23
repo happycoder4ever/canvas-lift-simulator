@@ -23,25 +23,26 @@ export interface LiftConfig {
 export class Lift implements IRenderable, IUpdatable {
   private config: LiftConfig;
 
-  private currentFloor: number = 0;
-  private currentLoad: number = 0;
+  private currentFloor = 0;
+  private currentLoad = 0;
+
   private state: LiftState = "idle";
   private powerState: PowerState = "off";
   private doorState: DoorState = "closed";
   private moveDirection: MoveDirection = "idle";
 
-  private startTimer: number = 0;
-  private waitTimer: number = 0;
-  private doorTimer: number = 0;
-  private moveProgress: number = 0;
+  private startTimer = 0;
+  private waitTimer = 0;
+  private doorTimer = 0;
+  private moveProgress = 0;
+  private time = 0;
 
   private scheduleList: ScheduleType[] = [];
-
-  private time: number = 0;
 
   private ctx: CanvasRenderingContext2D;
   private metalPattern: CanvasPattern | null = null;
   private powerButton: HTMLButtonElement;
+
   private controlPanel: ControlPanel;
   private display: Display;
   private shaft: Shaft;
@@ -55,45 +56,298 @@ export class Lift implements IRenderable, IUpdatable {
     this.config = config;
     this.ctx = ctx;
     this.powerButton = button;
+
     button.textContent = "Start";
     button.addEventListener("click", () => {
       if (this.powerState === "off") this.start();
-      if (this.powerState === "on") this.stop();
+      else if (this.powerState === "on") this.stop();
     });
 
     this.metalPattern = patternedBrush()(this.ctx);
+
     this.display = new Display(450, 50, this.ctx, this);
     this.controlPanel = new ControlPanel(this.ctx, this);
     this.shaft = new Shaft(this.ctx, this);
 
-    for (let i = 0; i < this.config.numberofFloors; i++)
+    for (let i = 0; i < this.config.numberofFloors; i++) {
       this.scheduleList.push("null");
+    }
 
     this.loop = this.loop.bind(this);
 
     canvas.addEventListener("click", (event) => {
       const rect = canvas.getBoundingClientRect();
-      const mouseX = event.clientX - rect.left;
-      const mouseY = event.clientY - rect.top;
-      for (const button of this.controlPanel["floorButtons"]) {
-        if (button.contains(mouseX, mouseY)) button.onClick();
-      }
-      if (this.controlPanel["openDoorButton"].contains(mouseX, mouseY)) {
-        this.controlPanel["openDoorButton"].onClick();
-      } else if (
-        this.controlPanel["closeDoorButton"].contains(mouseX, mouseY)
-      ) {
-        this.controlPanel["closeDoorButton"].onClick();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+
+      for (const btn of this.controlPanel["floorButtons"]) {
+        if (btn.contains(x, y)) btn.onClick();
       }
 
-      for (const floorBox of this.shaft["floorBoxes"]) {
-        if (floorBox["UpButton"]?.contains(mouseX, mouseY))
-          floorBox["UpButton"]?.onClick();
-        else if (floorBox["DownButton"]?.contains(mouseX, mouseY))
-          floorBox["DownButton"]?.onClick();
+      if (this.controlPanel["openDoorButton"].contains(x, y))
+        this.controlPanel["openDoorButton"].onClick();
+      else if (this.controlPanel["closeDoorButton"].contains(x, y))
+        this.controlPanel["closeDoorButton"].onClick();
+
+      for (const fb of this.shaft["floorBoxes"]) {
+        if (fb["UpButton"]?.contains(x, y)) fb["UpButton"]?.onClick();
+        else if (fb["DownButton"]?.contains(x, y)) fb["DownButton"]?.onClick();
       }
     });
+
     this.render();
+  }
+
+  /* ===========================
+     PURE HELPERS
+     =========================== */
+
+  private needToMoveOn(): boolean {
+    for (let i = 0; i < this.scheduleList.length; i++) {
+      if (this.scheduleList[i] !== "null") return true;
+    }
+    return false;
+  }
+
+  private needToStop(): boolean {
+    const s = this.scheduleList[this.currentFloor];
+    if (s === "go") return true;
+    if (s === "call-up" || s === "call-down") return true; // stop for any call on current floor
+    return false;
+  }
+
+  private chooseNextDirection(): MoveDirection {
+    const current = this.currentFloor;
+    const floors = this.scheduleList;
+    const top = this.getNumberOfFloors() - 1;
+
+    if (this.moveDirection === "up") {
+      // any scheduled floors above?
+      for (let i = current + 1; i <= top; i++) {
+        if (floors[i] !== "null") return "up";
+      }
+      // if none above, check floors below
+      for (let i = current - 1; i >= 0; i--) {
+        if (floors[i] !== "null") return "down";
+      }
+    } else if (this.moveDirection === "down") {
+      // any scheduled floors below?
+      for (let i = current - 1; i >= 0; i--) {
+        if (floors[i] !== "null") return "down";
+      }
+      // if none below, check floors above
+      for (let i = current + 1; i <= top; i++) {
+        if (floors[i] !== "null") return "up";
+      }
+    } else {
+      // idle → pick nearest
+      let nearest: number | null = null;
+      let minDist = Infinity;
+      for (let i = 0; i <= top; i++) {
+        if (floors[i] !== "null") {
+          const d = Math.abs(i - current);
+          if (d < minDist) {
+            minDist = d;
+            nearest = i;
+          }
+        }
+      }
+      if (nearest === null) return "idle";
+      return nearest > current ? "up" : "down";
+    }
+
+    return "idle";
+  }
+  // Check if there are any requests in the current moving direction
+  private hasRequestsInCurrentDirection(): boolean {
+    return this.hasRequestsInDirection(this.moveDirection);
+  }
+
+  // Check for requests in a given direction, including opposite-type calls along the path
+  private hasRequestsInDirection(direction: MoveDirection): boolean {
+    const current = this.currentFloor;
+
+    if (direction === "up") {
+      for (let i = current + 1; i < this.scheduleList.length; i++) {
+        const s = this.scheduleList[i];
+        if (s !== "null") return true;
+      }
+    } else if (direction === "down") {
+      for (let i = current - 1; i >= 0; i--) {
+        const s = this.scheduleList[i];
+        if (s !== "null") return true;
+      }
+    }
+
+    return false;
+  }
+
+  private offLight() {
+    this.shaft.offLight(this.currentFloor);
+    this.controlPanel.offLight(this.currentFloor);
+  }
+
+  /* ===========================
+     MAIN LOOP
+     =========================== */
+
+  private loop(time: number) {
+    const dt = time - this.time;
+    this.time = time;
+
+    this.update(dt);
+    this.render();
+
+    if (this.powerState !== "off") {
+      requestAnimationFrame(this.loop);
+    }
+  }
+
+  /* ===========================
+     UPDATE
+     =========================== */
+
+  public update(deltaTime: number): void {
+    if (this.powerState === "starting" || this.powerState === "stopping") {
+      this.startTimer += deltaTime;
+      if (this.startTimer >= this.config.startingLatency) {
+        this.powerState = this.powerState === "starting" ? "on" : "off";
+        this.powerButton.textContent =
+          this.powerState === "on" ? "Stop" : "Start";
+        this.powerButton.disabled = false;
+        this.startTimer = 0;
+      }
+      return;
+    }
+
+    if (this.powerState === "off") return;
+
+    switch (this.state) {
+      case "idle":
+        if (this.needToMoveOn() && this.doorState === "closed") {
+          this.moveDirection = this.chooseNextDirection();
+          if (this.moveDirection !== "idle") {
+            this.state = "moving";
+            this.moveProgress = 0;
+          }
+        }
+        break;
+
+      case "moving":
+        if (this.moveDirection === "idle") {
+          this.state = "idle";
+          break;
+        }
+
+        // Handle building boundaries
+        if (
+          (this.moveDirection === "down" && this.currentFloor === 0) ||
+          (this.moveDirection === "up" &&
+            this.currentFloor === this.getNumberOfFloors() - 1)
+        ) {
+          this.scheduleList[this.currentFloor] = "null";
+          this.offLight();
+
+          this.state = "doorOpening";
+          this.doorState = "changing";
+          this.doorTimer = 0;
+          this.moveProgress = 0;
+          break;
+        }
+
+        // Move progress
+        this.moveProgress += this.config.speedRate * deltaTime;
+        if (this.moveProgress < 100) break;
+
+        // ARRIVAL: increment/decrement floor
+        this.currentFloor =
+          this.moveDirection === "up"
+            ? Math.min(this.currentFloor + 1, this.getNumberOfFloors() - 1)
+            : Math.max(this.currentFloor - 1, 0);
+        this.moveProgress = 0;
+
+        // STOP at floor if needed
+        if (this.needToStop()) {
+          this.offLight();
+          this.scheduleList[this.currentFloor] = "null";
+
+          this.state = "doorOpening";
+          this.doorState = "changing";
+          this.doorTimer = 0;
+          break; // do not check direction now
+        }
+
+        // Determine if we should continue in current direction
+        const hasRequestsAhead = this.hasRequestsInCurrentDirection();
+
+        if (!hasRequestsAhead) {
+          const opposite = this.moveDirection === "up" ? "down" : "up";
+          const hasRequestsOpposite = this.hasRequestsInDirection(opposite);
+
+          if (hasRequestsOpposite) {
+            this.moveDirection = opposite;
+          } else {
+            this.moveDirection = "idle";
+            this.state = "idle";
+          }
+        }
+        break;
+
+      case "doorOpening":
+        this.doorTimer += deltaTime;
+        if (this.doorTimer >= this.config.doorDuration) {
+          this.doorState = "open";
+          this.state = "waiting";
+          this.waitTimer = 0;
+          this.doorTimer = 0;
+        }
+        break;
+
+      case "waiting":
+        this.waitTimer += deltaTime;
+        if (this.waitTimer >= this.config.waitDuration) {
+          this.state = "doorClosing";
+          this.doorState = "changing";
+          this.doorTimer = 0;
+        }
+        break;
+
+      case "doorClosing":
+        this.doorTimer += deltaTime;
+        if (this.doorTimer >= this.config.doorDuration) {
+          this.doorState = "closed";
+          this.doorTimer = 0;
+
+          if (this.needToMoveOn()) {
+            this.moveDirection = this.chooseNextDirection();
+            this.state = "moving";
+            this.moveProgress = 0;
+          } else {
+            this.state = "idle";
+            this.moveDirection = "idle";
+          }
+        }
+        break;
+    }
+
+    this.shaft.update(deltaTime);
+    this.controlPanel.update(deltaTime);
+    this.display.update(deltaTime);
+  }
+
+  /* ===========================
+     RENDER
+     =========================== */
+
+  public render(): void {
+    this.ctx.clearRect(0, 0, 800, 800);
+    this.shaft.render();
+
+    this.ctx.fillStyle = this.metalPattern!;
+    this.ctx.fillRect(300, 0, 500, 800);
+
+    this.display.render();
+    this.controlPanel.render();
   }
 
   public getState(): LiftState {
@@ -154,244 +408,22 @@ export class Lift implements IRenderable, IUpdatable {
     }
   }
 
-  private loop(time: number): void {
-    const deltaTime = time - this.time;
-    this.update(deltaTime);
-    this.render();
-    this.time = time;
-    if (this.powerState !== "off") requestAnimationFrame(this.loop);
-  }
-
-  public render(): void {
-    this.ctx.clearRect(0, 0, 800, 800);
-    this.shaft.render();
-    this.ctx.fillStyle = this.metalPattern!;
-    this.ctx.fillRect(300, 0, 500, 800);
-    this.display.render();
-    this.controlPanel.render();
-
-    const gradient = this.ctx.createLinearGradient(300, 0, 800, 0);
-    gradient.addColorStop(0, "rgba(255, 255, 255, 0.0)");
-    gradient.addColorStop(0.3, "rgba(255, 255, 255, 0.2)");
-    gradient.addColorStop(0.5, "rgba(255, 255, 255, 0.4)");
-    gradient.addColorStop(0.7, "rgba(255, 255, 255, 0.2)");
-    gradient.addColorStop(1, "rgba(255, 255, 255, 0.0)");
-    this.ctx.fillStyle = gradient;
-    this.ctx.fillRect(300, 0, 500, 800);
-
-    this.ctx.fillStyle = "#000000";
-    this.ctx.font = "12pt Arial";
-    this.ctx.fillText(this.doorState, 400, 10);
-  }
-
-  private needToStop() {
-    switch (this.moveDirection) {
-      case "up":
-        if (this.currentFloor === this.getNumberOfFloors() - 1) return true;
-        if (
-          this.scheduleList[this.currentFloor] === "go" ||
-          this.scheduleList[this.currentFloor] === "call-up"
-        )
-          return true;
-        break;
-      case "down":
-        if (this.currentFloor === 0) return true;
-        if (
-          this.scheduleList[this.currentFloor] === "go" ||
-          this.scheduleList[this.currentFloor] === "call-down"
-        )
-          return true;
-        break;
-      default:
-        break;
-    }
-    return false;
-  }
-
-  private needToMoveOn() {
-    switch (this.moveDirection) {
-      case "up":
-        for (let fr = this.currentFloor; fr < this.getNumberOfFloors(); fr++) {
-          if (
-            this.scheduleList[fr] === "go" ||
-            this.scheduleList[fr] === "call-up"
-          )
-            return true;
-          let lastCall = true;
-          if (this.scheduleList[fr] === "call-down") {
-            for (let frup = fr + 1; frup < this.getNumberOfFloors(); frup++) {
-              if (
-                this.scheduleList[frup] === "go" &&
-                this.scheduleList[frup] === "call-up"
-              ) {
-                lastCall = false;
-                break;
-              }
-            }
-            if (lastCall) return true;
-          }
-        }
-        return false;
-      case "down":
-        for (let fr = this.currentFloor; fr >= 0; fr--) {
-          if (
-            this.scheduleList[fr] === "go" ||
-            this.scheduleList[fr] === "call-down"
-          )
-            return true;
-          let lastCall = true;
-          if (this.scheduleList[fr] === "call-up") {
-            for (let frup = fr - 1; frup >= 0; frup--) {
-              if (
-                this.scheduleList[frup] === "go" &&
-                this.scheduleList[frup] === "call-down"
-              ) {
-                lastCall = false;
-                break;
-              }
-            }
-            if (lastCall) return true;
-          }
-        }
-        return false;
-    }
-  }
-
-  private offLight() {
-    this.shaft.offLight(this.currentFloor);
-    this.controlPanel.offLight(this.currentFloor);
-  }
-
-  public update(deltaTime: number): void {
-    if (this.powerState === "starting") {
-      this.startTimer += deltaTime;
-      if (this.startTimer >= this.config.startingLatency) {
-        this.powerState = "on";
-        this.powerButton.disabled = false;
-        this.powerButton.textContent = "Stop";
-        this.startTimer = 0;
-      } else return;
-    }
-    if (this.powerState === "stopping") {
-      this.startTimer += deltaTime;
-      if (this.startTimer >= this.config.startingLatency) {
-        this.powerState = "off";
-        this.powerButton.disabled = false;
-        this.powerButton.textContent = "Start";
-        this.startTimer = 0;
-      } else return;
-    }
-
-    if (this.powerState === "off") return;
-
-    switch (this.state) {
-      case "idle":
-        // idle occurs only if doors are closed
-        let hasCall = false;
-        for (let i = 0; i < this.config.numberofFloors; i++) {
-          if (this.scheduleList[i] !== "null") {
-            hasCall = true;
-            this.moveDirection = i < this.currentFloor ? "down" : "up";
-            break;
-          }
-        }
-        if (hasCall && this.doorState === "closed") {
-          this.state = "moving";
-          this.moveProgress = 0;
-          this.doorTimer = 0;
-        }
-        break;
-
-      case "moving":
-        this.moveProgress += this.config.speedRate * deltaTime;
-        if (this.moveProgress < 100) break;
-        switch (this.moveDirection) {
-          case "up":
-            this.currentFloor = Math.min(
-              this.currentFloor + 1,
-              this.getNumberOfFloors() - 1
-            );
-            if (this.needToStop()) {
-              this.state = "doorOpening";
-              this.doorState = "changing";
-              this.doorTimer = 0;
-              this.offLight();
-            }
-            this.moveProgress = 0;
-            break;
-          case "down":
-            this.currentFloor = Math.max(this.currentFloor - 1, 0);
-            if (this.needToStop()) {
-              this.state = "doorOpening";
-              this.doorState = "changing"
-              this.doorTimer = 0;
-              this.offLight();
-            }
-            this.moveProgress = 0;
-            break;
-          default:
-            this.state = "idle";
-            this.moveProgress = 0;
-            break;
-        }
-        break;
-
-      case "doorOpening":
-        this.doorTimer += deltaTime;
-        if (this.doorTimer >= this.config.doorDuration) {
-          this.doorState = "open";
-          if (this.scheduleList[this.currentFloor] !== "null")
-            this.scheduleList[this.currentFloor] = "null";
-          this.waitTimer = 0;
-          this.doorTimer = 0;
-          this.state = "waiting"; // doors stay open during waiting
-        }
-        break;
-
-      case "waiting":
-        this.waitTimer += deltaTime;
-        if (this.waitTimer >= this.config.waitDuration) {
-          // after waiting, doors close before going idle or moving
-          this.state = "doorClosing";
-          this.doorState = "changing"
-          this.doorTimer = 0;
-          this.waitTimer = 0;
-        }
-        break;
-
-      case "doorClosing":
-        this.doorTimer += deltaTime;
-        if (this.doorTimer >= this.config.doorDuration) {
-          this.doorState = "closed";
-          if (this.needToMoveOn()) {
-            this.state = "moving";
-            this.moveProgress = 0;
-          } else {
-            this.state = "idle"; // idle only after doors fully closed
-            this.moveDirection = "idle";
-          }
-          this.doorTimer = 0;
-        }
-        break;
-    }
-
-    this.shaft.update(deltaTime);
-    this.controlPanel.update(deltaTime);
-    this.display.update(deltaTime);
-  }
+  /* ===========================
+     POWER
+     =========================== */
 
   public start(): void {
+    this.powerState = "starting";
     this.powerButton.textContent = "Starting...";
     this.powerButton.disabled = true;
-    this.powerState = "starting";
     this.startTimer = 0;
     requestAnimationFrame(this.loop);
   }
 
   public stop(): void {
+    this.powerState = "stopping";
     this.powerButton.textContent = "Stopping...";
     this.powerButton.disabled = true;
-    this.powerState = "stopping";
     this.startTimer = 0;
   }
 }

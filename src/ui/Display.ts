@@ -6,6 +6,9 @@ class Display implements IRenderable, IUpdatable {
   private lift: Lift;
   private x: number;
   private y: number;
+  private blinkTimer = 0;
+  private blinkVisible = true;
+
   constructor(x: number, y: number, ctx: CanvasRenderingContext2D, lift: Lift) {
     this.x = x;
     this.y = y;
@@ -14,74 +17,104 @@ class Display implements IRenderable, IUpdatable {
   }
 
   public render(): void {
-    // Implementation of render method
-    let displayLEDX = this.x + 10;
-    let displayLEDY = this.y + 10;
+    const displayWidth = 200;
+    const displayHeight = 100;
+    const displayLEDX = this.x + 10;
+    const displayLEDY = this.y + 10;
+    const displayLEDWidth = 180;
+    const displayLEDHeight = 80;
 
-    let displayWidth = 200;
-    let displayHeight = 100;
-    let displayLEDWidth = 180;
-    let displayLEDHeight = 80;
-    // Draw Static Objects
-    // Draw Display Frame
-
-    this.ctx.fillStyle = "#c0c0c0";
-    this.ctx.fillRect(this.x, this.y, displayWidth, displayHeight);
-
-    // Draw Display LED Screen
-    this.ctx.fillStyle =
-      this.lift.getPowerState() === "off" ? "#404040" : "#2020ff";
+    // ---------- LED Screen Gradient ----------
+    const ledGradient = this.ctx.createLinearGradient(
+      displayLEDX,
+      displayLEDY,
+      displayLEDX,
+      displayLEDY + displayLEDHeight
+    );
+    if (this.lift.getPowerState() === "off") {
+      ledGradient.addColorStop(0, "#404040");
+      ledGradient.addColorStop(1, "#303030");
+    } else {
+      ledGradient.addColorStop(0, "#1010ff");
+      ledGradient.addColorStop(1, "#2020ff");
+    }
+    this.ctx.fillStyle = ledGradient;
     this.ctx.fillRect(
       displayLEDX,
       displayLEDY,
       displayLEDWidth,
       displayLEDHeight
     );
+
+    // ---------- Glass Reflection ----------
+    this.ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
+    this.ctx.fillRect(
+      displayLEDX,
+      displayLEDY,
+      displayLEDWidth,
+      displayLEDHeight / 3
+    );
+
+    // ---------- Inner LED Shadow ----------
+    this.ctx.fillStyle = "rgba(0,0,0,0.3)";
+    this.ctx.fillRect(displayLEDX, displayLEDY, displayLEDWidth, 2); // top
+    this.ctx.fillRect(displayLEDX, displayLEDY, 2, displayLEDHeight); // left
+
+    // ---------- Render Based on Power State ----------
     this.ctx.textAlign = "left";
     this.ctx.textBaseline = "bottom";
+
+    const renderProgressBars = () => {
+      for (let i = 0; i < this.lift.getPowerProgress(); i++) {
+        const x = displayLEDX + 30 + i * (10 + 2);
+        const y = displayLEDY + 60;
+        const w = 10;
+        const h = 5;
+        this.ctx.fillRect(x, y, w, h);
+      }
+    };
+
     if (this.lift.getPowerState() === "starting") {
       this.ctx.fillStyle = "#ffffff";
       this.ctx.font = "25px Arial";
+      this.ctx.shadowColor = "#00f";
+      this.ctx.shadowBlur = 8;
       this.ctx.fillText("Starting...", displayLEDX + 45, displayLEDY + 50);
-      for (let i = 0; i < this.lift.getPowerProgress(); i++) {
-        let x = displayLEDX + 30 + i * (10 + 2);
-        let y = displayLEDY + 60;
-        let w = 10;
-        let h = 5;
-        this.ctx.fillRect(x, y, w, h);
-      }
+      this.ctx.shadowBlur = 0;
+      renderProgressBars();
     } else if (this.lift.getPowerState() === "stopping") {
       this.ctx.fillStyle = "#ffffff";
       this.ctx.font = "25px Arial";
+      this.ctx.shadowColor = "#00f";
+      this.ctx.shadowBlur = 8;
       this.ctx.fillText("Stopping...", displayLEDX + 45, displayLEDY + 50);
-      for (let i = 0; i < this.lift.getPowerProgress(); i++) {
-        let x = displayLEDX + 30 + i * (10 + 2);
-        let y = displayLEDY + 60;
-        let w = 10;
-        let h = 5;
-        this.ctx.fillRect(x, y, w, h);
-      }
+      this.ctx.shadowBlur = 0;
+      renderProgressBars();
     } else if (this.lift.getPowerState() === "on") {
-      // Print information on the LED Screen
-      // (1) Up/Down Arrows
+      const alpha = Math.abs(Math.sin(Date.now() / 250)); // smooth blink
+
+      // ---------- Up Arrow ----------
       this.ctx.fillStyle =
         this.lift.getState() === "moving" &&
         this.lift.getMoveDirection() === "up"
-          ? "#ffffff"
+          ? `rgba(255,255,255,${alpha})`
           : "#80808099";
-      // Up arrow
       this.ctx.beginPath();
       this.ctx.moveTo(displayLEDX + 30, displayLEDY + 10);
       this.ctx.lineTo(displayLEDX + 50, displayLEDY + 40);
       this.ctx.lineTo(displayLEDX + 30, displayLEDY + 30);
       this.ctx.lineTo(displayLEDX + 10, displayLEDY + 40);
       this.ctx.closePath();
+      this.ctx.shadowColor = "#00f";
+      this.ctx.shadowBlur = 8;
       this.ctx.fill();
-      // Down arrow under the up arrow
+      this.ctx.shadowBlur = 0;
+
+      // ---------- Down Arrow ----------
       this.ctx.fillStyle =
         this.lift.getState() === "moving" &&
         this.lift.getMoveDirection() === "down"
-          ? "#ffffff"
+          ? `rgba(255,255,255,${alpha})`
           : "#80808099";
       this.ctx.beginPath();
       this.ctx.moveTo(displayLEDX + 30, displayLEDY + 55);
@@ -89,62 +122,46 @@ class Display implements IRenderable, IUpdatable {
       this.ctx.lineTo(displayLEDX + 30, displayLEDY + 75);
       this.ctx.lineTo(displayLEDX + 10, displayLEDY + 45);
       this.ctx.closePath();
+      this.ctx.shadowColor = "#00f";
+      this.ctx.shadowBlur = 8;
       this.ctx.fill();
+      this.ctx.shadowBlur = 0;
 
-      // (2) Current Floor Number
+      // ---------- Current Floor ----------
       this.ctx.fillStyle = "#ffffff";
       this.ctx.font = "60px Arial";
+      this.ctx.shadowColor = "#00f";
+      this.ctx.shadowBlur = 10;
       this.ctx.fillText(
         (this.lift.getCurrentFloor() + 1).toString(),
         displayLEDX + 60,
         displayLEDY + 75
       );
+      this.ctx.shadowBlur = 0;
 
-      // (2.5) Current State
       this.ctx.font = "12px Arial";
-      this.ctx.fillText(
-        this.lift.getState(),
-        displayLEDX + 110,
-        displayLEDY + 25
-      );
-      // (3) Maximum Capacity
-      this.ctx.font = "12px Arial";
+      // ---------- Maximum Capacity ----------
       this.ctx.fillText(
         `MAX: ${this.lift.getMaxCapacity()}kg`,
         displayLEDX + 110,
-        displayLEDY + 55
+        displayLEDY + 75
       );
 
-      // (4) Current Load
-      this.ctx.fillText(
-        `  LD: ${this.lift.getCurrentLoad()}kg`,
-        displayLEDX + 110,
-        displayLEDY + 70
-      );
+      // ---------- Optional Scanlines ----------
+      this.ctx.fillStyle = "rgba(255,255,255,0.02)";
+      for (let i = 0; i < displayLEDHeight; i += 2) {
+        this.ctx.fillRect(displayLEDX, displayLEDY + i, displayLEDWidth, 1);
+      }
     }
-
-    // Draw Shadow for Display
-    this.ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-    // Bottom shadow
-    this.ctx.fillRect(this.x + 2, this.y + displayHeight + 2, displayWidth, 2);
-    // right shadow
-    this.ctx.fillRect(
-      this.x + displayWidth + 2,
-      this.y + 2,
-      2,
-      displayHeight + 2
-    );
-
-    // Inner shadow falling on the LED screen
-    this.ctx.fillStyle = "rgba(0, 0, 0, 1)";
-    // Top shadow
-    this.ctx.fillRect(displayLEDX, displayLEDY, displayLEDWidth, 2);
-    // Left shadow
-    this.ctx.fillRect(displayLEDX, displayLEDY, 2, displayLEDHeight);
   }
 
   public update(deltaTime: number): void {
-    // Implementation of update method
+    // Blink arrows every 500ms
+    this.blinkTimer += deltaTime;
+    if (this.blinkTimer >= 500) {
+      this.blinkVisible = !this.blinkVisible;
+      this.blinkTimer = 0;
+    }
   }
 }
 

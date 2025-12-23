@@ -55,10 +55,20 @@ export class FloorBox implements IRenderable {
     let floorHeight = 80;
     let floorTextX = this.x + 25;
     let floorTextY = this.y + 50;
-    // Draw Floor Box
-    this.ctx.fillStyle = "#c0c0c0";
+
+    // ===== 1. Gradient Background for FloorBox =====
+    const grad = this.ctx.createLinearGradient(
+      this.x,
+      this.y,
+      this.x + floorWidth,
+      this.y + floorHeight
+    );
+    grad.addColorStop(0, "#e0e0e0"); // lighter top-left
+    grad.addColorStop(1, "#a0a0a0"); // darker bottom-right
+    this.ctx.fillStyle = grad;
     this.ctx.fillRect(this.x, this.y, floorWidth, floorHeight);
 
+    // ===== 2. Floor Number =====
     this.ctx.fillStyle =
       this.lift.getPowerState() === "on" &&
       this.floorNumber === this.lift.getCurrentFloor()
@@ -67,7 +77,12 @@ export class FloorBox implements IRenderable {
     this.ctx.font = "30px Arial";
     this.ctx.fillText(`${this.floorNumber + 1}F`, floorTextX, floorTextY);
 
-    // Draw Call Buttons for each floor, Up and Down
+    // ===== 3. FloorBox border for depth =====
+    this.ctx.strokeStyle = "#888"; // subtle border
+    this.ctx.lineWidth = 2;
+    this.ctx.strokeRect(this.x, this.y, floorWidth, floorHeight);
+
+    // ===== 4. Call Buttons =====
     this.UpButton?.render();
     this.DownButton?.render();
   }
