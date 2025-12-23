@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Canvas Lift Simulator</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      }
+
+      html,
+      body {
+        height: 100%;
+      }
+
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center; /* center vertically */
+        background: linear-gradient(135deg, #e0e7ff, #fef9c3);
+      }
+
+      .container {
+        display: flex;
+        align-items: center; /* vertical alignment of left panel and canvas */
+        gap: 60px; /* space between left panel and canvas */
+      }
+
+      .left-panel {
+        display: flex;
+        flex-direction: column;
+        justify-content: center; /* vertical centering inside panel */
+        align-items: center;
+        height: 800px; /* match canvas height */
+        gap: 30px;
+      }
+
+      .left-panel h1 {
+        font-size: 2rem;
+        color: #4f46e5;
+        text-align: center;
+        text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2);
+      }
+
+      #power {
+        padding: 16px 28px;
+        font-size: 18px;
+        font-weight: bold;
+        color: #fff;
+        background: linear-gradient(135deg, #6366f1, #4f46e5);
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+      }
+
+      #power:hover {
+        background: linear-gradient(135deg, #4f46e5, #4338ca);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+      }
+
+      #power:active {
+        transform: translateY(0);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+      }
+
+      canvas#main {
+        width: 800px;
+        height: 800px;
+        border: 6px solid #4f46e5;
+        border-radius: 16px;
+        background: #f3f4f6;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+      }
+
+      footer {
+        position: absolute;
+        bottom: 10px;
+        width: 100%;
+        text-align: center;
+        font-size: 0.85rem;
+        color: #4b5563;
+      }
+
+      footer a {
+        color: #4f46e5;
+        text-decoration: none;
+      }
+
+      footer a:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="left-panel">
+        <h1>Canvas Lift Simulator</h1>
+        <button id="power">Start</button>
+      </div>
+      <canvas id="main" width="800" height="800"></canvas>
+    </div>
+
+    <footer>
+      &copy; 2025 Happy Coder Forever —
+      <a href="https://github.com/happycoder4ever/canvas-lift-simulator.git"
+        >GitHub</a
+      >
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
